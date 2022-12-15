@@ -1,0 +1,216 @@
+       1                                         .title m9312l47 - low rom - show modelcode, control registers/controllers, then boot
+       2                                
+       3                                ;--
+       4                                ;-- Copyright (c) 2008-2021 Sytse van Slooten
+       5                                ;--
+       6                                ;-- Permission is hereby granted to any person obtaining a copy of these VHDL source files and
+       7                                ;-- other language source files and associated documentation files ("the materials") to use
+       8                                ;-- these materials solely for personal, non-commercial purposes.
+       9                                ;-- You are also granted permission to make changes to the materials, on the condition that this
+      10                                ;-- copyright notice is retained unchanged.
+      11                                ;--
+      12                                ;-- The materials are distributed in the hope that they will be useful, but WITHOUT ANY WARRANTY;
+      13                                ;-- without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+      14                                ;--
+      15                                ;
+      16                                ; $Revision$
+      17                                ;
+      18                                ; general purpose register definitions
+      19                                ;
+      20 000000                         r0       = %0
+      21 000001                         r1       = %1
+      22 000002                         r2       = %2
+      23 000003                         r3       = %3
+      24 000004                         r4       = %4
+      25 000005                         r5       = %5
+      26 000006                         r6       = %6
+      27 000007                         r7       = %7
+      28 000006                         sp       = %6
+      29 000007                         pc       = %7
+      30                                
+      31                                         .asect
+      32 165000                                  .=165000
+      33 165000                                  base     =.
+      34 165000 000000  000000  000000           .word 0,0,0,0
+         165006 000000                  
+      35 165010 000137  173004          prtoct:  jmp   @#173004
+      36 165014 000137  173010          prtascz: jmp   @#173010
+      37 165020                                  .=base+20
+      38                                ;
+      39                                ; delay a bit, give the terminal (if it's there) some time to boot
+      40                                ;
+      41 165020 005002                           clr   r2
+      42                                10$:
+      43 165022 005202                           inc   r2
+      44 165024 001376                           bne   10$
+      45                                ;
+      46                                ; hello world
+      47                                ;
+      48 165026 012702  165254                   mov   #hello,r2
+      49 165032 010701                           mov   pc,r1
+      50 165034 000767                           br    prtascz
+      51                                ;
+      52                                ; decode cpu modelcode, should be in kernel r0 after reset
+      53                                ;
+      54                                mcode:
+      55 165036 012702  000057                   mov   #47.,r2
+      56                                10$:
+      57 165042 005202                           inc   r2
+      58 165044 020027  000012                   cmp   r0,#10.
+      59 165050 002403                           blt   20$
+      60 165052 162700  000012                   sub   #10.,r0
+      61 165056 000771                           br    10$
+      62                                20$:
+      63 165060 062700  000060                   add   #48.,r0
+      64 165064 105737  177564                   tstb  @#177564
+      65 165070 100375                           bpl   .-4
+      66 165072 110237  177566                   movb  r2,@#177566
+      67 165076 105737  177564                   tstb  @#177564
+      68 165102 100375                           bpl   .-4
+      69 165104 110037  177566                   movb  r0,@#177566
+      70                                ;
+      71                                ; check for fpu
+      72                                ;
+      73 165110 012706  001000                   mov   #1000,sp
+      74 165114 012737  165140  000010           mov   #60$,@#10
+      75 165122 005037  000012                   clr   @#12
+      76 165126 170011                           setd
+      77 165130 012702  165313                   mov   #fpu,r2
+      78 165134 010701                           mov   pc,r1
+      79 165136 000726                           br    prtascz
+      80                                60$:
+      81                                ;
+      82                                ;
+      83                                ;
+      84 165140 012702  165320                   mov   #crlf,r2
+      85 165144 010701                           mov   pc,r1
+      86 165146 000722                           br    prtascz
+      87                                ;
+      88                                ; list cr
+      89                                ;
+      90                                listcr:
+      91 165150 005004                           clr   r4
+      92 165152 012737  165242  000004           mov   #60$,@#4
+      93 165160 005037  000006                   clr   @#6
+      94                                10$:
+      95 165164 005005                           clr   r5
+      96                                20$:
+      97 165166 012706  001000                   mov   #1000,sp      ; reset sp
+      98 165172 016504  165344                   mov   adrtab(r5),r4 ; load address
+      99 165176 005704                           tst   r4            ; check for end of table
+     100 165200 001423                           beq   80$           ; end of table, done
+     101 165202 005714                           tst   (r4)          ; check address
+     102 165204 010400                           mov   r4,r0         ; if we continue here, the address exists
+     103 165206 010701                           mov   pc,r1         ; print the address
+     104 165210 000677                           br    prtoct
+     105 165212 012702  165323                   mov   #sep,r2       ; print separator
+     106 165216 010701                           mov   pc,r1
+     107 165220 000675                           br    prtascz
+     108 165222 016502  165346                   mov   adrtab+2(r5),r2   ; load pointer to name
+     109 165226 010701                           mov   pc,r1
+     110 165230 000671                           br    prtascz
+     111 165232 012702  165320                   mov   #crlf,r2      ; next line
+     112 165236 010701                           mov   pc,r1
+     113 165240 000665                           br    prtascz
+     114                                60$:
+     115 165242 062705  000004                   add   #4,r5
+     116 165246 000747                           br    20$
+     117                                80$:
+     118 165250 000137  173000                   jmp   @#173000
+     119                                ;
+     120                                ; data
+     121                                ;
+     122                                         .even
+     123                                
+     124 165254    040     015     012  hello:   .ascii / /<15><12>
+     125 165257    110     145     154           .asciz /Hello, world [t48]: cpu 11/<57>
+         165262    154     157     054  
+         165265    040     167     157  
+         165270    162     154     144  
+         165273    040     133     164  
+         165276    064     070     135  
+         165301    072     040     143  
+         165304    160     165     040  
+         165307    061     061     057  
+         165312    000                  
+     126 165313    040     146     160  fpu:     .asciz / fpu/
+         165316    165     000          
+     127 165320    015     012     000  crlf:    .asciz <15><12>
+     128 165323    040     055     040  sep:     .asciz / - /
+         165326    000                  
+     129 165327    040     040     000  tsep:    .asciz /  /
+     130 165332    040     040     040  ssep:    .asciz /         /
+         165335    040     040     040  
+         165340    040     040     040  
+         165343    000                  
+     131                                
+     132                                          .even
+     133                                adrtab:
+     134 165344 171000  165462                    .word 171000,ad        ; mincad
+     135 165350 171020  165470                    .word 171020,kw0       ; minckw 0
+     136 165354 171024  165477                    .word 171024,kw1       ; minckw 1
+     137 165360 171060  165506                    .word 171060,aa0       ; mincaa 0
+     138 165364 171070  165515                    .word 171070,aa1       ; mincaa 1
+     139 165370 171100  165524                    .word 171100,aa2       ; mincaa 2
+     140 165374 171110  165533                    .word 171110,aa3       ; mincaa 3
+     141 165400 171160  165542                    .word 171160,di0       ; mincdi 0
+     142 165404 171170  165551                    .word 171170,di1       ; mincdi 1
+     143 165410 171200  165560                    .word 171200,di2       ; mincdi 2
+     144 165414 171210  165567                    .word 171210,di3       ; mincdi 3
+     145 165420 171260  165576                    .word 171260,do0       ; mincdo 0
+     146 165424 171264  165605                    .word 171264,do1       ; mincdo 1
+     147 165430 171270  165614                    .word 171270,do2       ; mincdo 2
+     148 165434 171274  165623                    .word 171274,do3       ; mincdo 3
+     149 165440 177400  165457                    .word 177400,trk
+     150 165444 174400  165454                    .word 174400,trl
+     151 165450 000000  000000                    .word 0,0
+     152                                ;
+     153 165454    162     154     000  trl:     .asciz /rl/
+     154 165457    162     153     000  trk:     .asciz /rk/
+     155 165462    155     156     143  ad:      .asciz /mncad/
+         165465    141     144     000  
+     156 165470    155     156     143  kw0:     .asciz /mnckw0/
+         165473    153     167     060  
+         165476    000                  
+     157 165477    155     156     143  kw1:     .asciz /mnckw1/
+         165502    153     167     061  
+         165505    000                  
+     158 165506    155     156     143  aa0:     .asciz /mncaa0/
+         165511    141     141     060  
+         165514    000                  
+     159 165515    155     156     143  aa1:     .asciz /mncaa1/
+         165520    141     141     061  
+         165523    000                  
+     160 165524    155     156     143  aa2:     .asciz /mncaa2/
+         165527    141     141     062  
+         165532    000                  
+     161 165533    155     156     143  aa3:     .asciz /mncaa3/
+         165536    141     141     063  
+         165541    000                  
+     162 165542    155     156     143  di0:     .asciz /mncdi0/
+         165545    144     151     060  
+         165550    000                  
+     163 165551    155     156     143  di1:     .asciz /mncdi1/
+         165554    144     151     061  
+         165557    000                  
+     164 165560    155     156     143  di2:     .asciz /mncdi2/
+         165563    144     151     062  
+         165566    000                  
+     165 165567    155     156     143  di3:     .asciz /mncdi3/
+         165572    144     151     063  
+         165575    000                  
+     166 165576    155     156     143  do0:     .asciz /mncdo0/
+         165601    144     157     060  
+         165604    000                  
+     167 165605    155     156     143  do1:     .asciz /mncdo1/
+         165610    144     157     061  
+         165613    000                  
+     168 165614    155     156     143  do2:     .asciz /mncdo2/
+         165617    144     157     062  
+         165622    000                  
+     169 165623    155     156     143  do3:     .asciz /mncdo3/
+         165626    144     157     063  
+         165631    000                  
+     170                                
+     171                                
+     171                                

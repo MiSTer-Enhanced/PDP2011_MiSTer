@@ -1,0 +1,271 @@
+       1                                         .title   M9312 boot roms
+       2                                ;
+       3                                ;
+       4                                ; boot code taken from http://ak6dn.dyndns.org/PDP-11/M9312/ and modified to work with m9312l47.mac
+       5                                ; which does not include diagnostics, does not use the rom code letters.
+       6                                ;
+       7                                
+       8 000001                         bit0     =000001              ; plain old bit definitions
+       9 000002                         bit1     =000002              ;
+      10 000004                         bit2     =000004              ;
+      11 000010                         bit3     =000010              ;
+      12 000020                         bit4     =000020              ;
+      13 000040                         bit5     =000040              ;
+      14 000100                         bit6     =000100              ;
+      15 000200                         bit7     =000200              ;
+      16 000400                         bit8     =000400              ;
+      17 001000                         bit9     =001000              ;
+      18 002000                         bit10    =002000              ;
+      19 004000                         bit11    =004000              ;
+      20 010000                         bit12    =010000              ;
+      21 020000                         bit13    =020000              ;
+      22 040000                         bit14    =040000              ;
+      23 100000                         bit15    =100000              ;
+      24                                
+      25 000040                         BL       =040                 ; ascii SPACE
+      26 000015                         CR       =015                 ; ascii CR
+      27 000012                         LF       =012                 ; ascii LF
+      28 000400                         U        =bit8                ; upperbyte multiplier
+      29 000001                         L        =bit0                ; lowerbyte multiplier
+      30                                
+      31                                         .asect
+      32 173000                                  .=173000
+      33                                ;
+      34                                ;
+      35                                ;
+      36 173000 000137  173014                   jmp   @#boot         ; 173000
+      37 173004 000137  173436                   jmp   @#prtoct       ; 173004
+      38                                bprtascz:
+      39 173010 000137  173412                   jmp   @#prtascz      ; 173010
+      40                                ;
+      41                                ; boot: boot from first controller that exists in the system out of rk,rl,rh
+      42                                ;
+      43                                boot:
+      44 173014 012706  001000                   mov   #1000,sp
+      45 173020 005037  000006                   clr   @#6
+      46 173024 012737  173050  000004           mov   #nork,@#4
+      47 173032 005737  177400                   tst   @#177400
+      48 173036 012702  173504                   mov   #bootrk,r2
+      49 173042 010701                           mov   pc,r1
+      50 173044 000761                           br    bprtascz
+      51 173046 000502                           br    rkgo
+      52                                ;
+      53                                nork:
+      54 173050 012737  173074  000004           mov   #norl,@#4
+      55 173056 005737  174400                   tst   @#174400
+      56 173062 012702  173526                   mov   #bootrl,r2
+      57 173066 010701                           mov   pc,r1
+      58 173070 000747                           br    bprtascz
+      59 173072 000417                           br    rlgo
+      60                                ;
+      61                                norl:
+      62 173074 012737  173120  000004           mov   #norp,@#4
+      63 173102 005737  176700                   tst   @#176700
+      64 173106 012702  173550                   mov   #bootrp,r2
+      65 173112 010701                           mov   pc,r1
+      66 173114 000735                           br    bprtascz
+      67 173116 000502                           br    rpgo
+      68                                ;
+      69                                norp:
+      70 173120 012702  173572                   mov   #nodev,r2
+      71 173124 010701                           mov   pc,r1
+      72 173126 000730                           br    bprtascz
+      73 173130 000000                           halt
+      74                                
+      75                                ; --------------------------------------------------
+      76                                ; rl
+      77                                ; --------------------------------------------------
+      78                                
+      79 174400                         rlcsr     =174400             ; std RL11 csrbase
+      80                                
+      81 000000                         rlcs      =+0                 ; control/status
+      82 000002                         rlba      =+2                 ; bus address
+      83 000004                         rlda      =+4                 ; disk address
+      84 000006                         rlmp      =+6                 ; multipurpose
+      85                                
+      86 000004                         cmstat    =2*2                ; get status
+      87 000006                         cmseek    =3*2                ; seek
+      88 000010                         cmrdhd    =4*2                ; read header
+      89 000014                         cmrdda    =6*2                ; read data
+      90                                
+      91 173132 012701  174400          rlgo:    mov   #rlcsr,r1
+      92 173136 005011                           clr   (r1)           ; clear unit number etc
+      93 173140 012761  000013  000004           mov   #013,rlda(r1)  ; subcmd reset+getstatus
+      94 173146 012711  000004                   mov   #cmstat,(r1)   ; execute
+      95 173152 105711                  1$:      tstb  (r1)           ; test for ready
+      96 173154 100376                           bpl   1$             ; wait
+      97                                
+      98 173156 012711  000010                   mov   #cmrdhd,(r1)   ; execute
+      99 173162 105711                  2$:      tstb  (r1)           ; test for ready
+     100 173164 100376                           bpl   2$             ; wait
+     101                                
+     102 173166 016102  000006                   mov   rlmp(r1),r2    ; retrieve cyl/head/sector
+     103 173172 042702  000077                   bic   #77,r2         ; set sector to zero
+     104 173176 005202                           inc   r2             ; set head 0, seek to cyl 0
+     105 173200 010261  000004                   mov   r2,rlda(r1)    ; into da for seek
+     106 173204 012711  000006                   mov   #cmseek,(r1)        ; execute
+     107 173210 105711                  3$:      tstb  (r1)           ; test for ready
+     108 173212 100376                           bpl   3$             ; wait
+     109                                
+     110 173214 005061  000004                   clr   rlda(r1)       ; select cyl0/head0/sector0
+     111 173220 012761  177000  000006           mov   #-512.,rlmp(r1)      ; set word count
+     112 173226 012711  000014                   mov   #cmrdda,(r1)        ; execute
+     113 173232 105711                  4$:      tstb  (r1)           ; test for ready
+     114 173234 100376                           bpl   4$             ; wait
+     115                                
+     116 173236 005711                           tst   (r1)           ; test for error
+     117 173240 100002                           bpl   5$             ; br if ok
+     118 173242 000005                           reset                ; ERROR - reset the world
+     119 173244 000732                           br rlgo              ; retry
+     120                                
+     121 173246 042711  000377          5$:      bic   #377,(r1)      ; execute nop cmd
+     122 173252 005007                           clr   pc             ; jump to bootstrap at zero
+     123                                
+     124                                ; --------------------------------------------------
+     125                                ; rk
+     126                                ; --------------------------------------------------
+     127                                
+     128 177400                         rkcsr    =177400              ; std RK03/05 DECdisk csrbase
+     129                                
+     130 000002                         rkwc     =+6-4                ; word count
+     131 000004                         rkba     =+10-4               ; bus address
+     132 000006                         rkda     =+12-4               ; disk address
+     133                                
+     134 177340                         tccsr    =177340              ; std TU55/56 DECtape csrbase
+     135                                
+     136 177776                         tccs     =+0-2                ; control/status
+     137 000002                         tcwc     =+4-2                ; word count
+     138                                
+     139 000002                         xxwc     =rkwc                ; common word count offset
+     140                                
+     141 165564                         diags    =165564              ; console diags phase2 entry
+     142                                
+     143                                
+     144 173254 012701  177404          rkgo:    mov   #rkcsr+4,r1    ; boot std csr, unit <R0>
+     145 173260 005061  000004                   clr rkba(r1)         ; clear bus address
+     146 173264 005061  000006                   clr rkda(r1)         ; unit number, sector 0 to disk addr
+     147                                
+     148 173270 012761  177000  000002  common:  mov   #-512.,xxwc(r1)   ; set word count
+     149 173276 012711  000005                   mov   #5,(r1)        ; execute READ+GO
+     150 173302 105711                  2$:      tstb  (r1)           ; test ready
+     151 173304 100376                           bpl   2$             ; loop
+     152                                
+     153 173306 005711                           tst   (r1)           ; check error
+     154 173310 100002                           bpl   3$             ; br if no error
+     155                                
+     156 173312 000005                           reset                ; reset the world
+     157 173314 000757                           br    rkgo           ; and retry
+     158                                
+     159 173316 042711  000377          3$:      bic   #377,(r1)      ; nop command
+     160 173322 005007                           clr   pc             ; jump to loaded boot sector
+     161                                
+     162                                
+     163                                ; --------------------------------------------------
+     164                                ; rp
+     165                                ; --------------------------------------------------
+     166                                
+     167 176700                         rmcsr    =176700              ; std RH11 csrbase
+     168                                
+     169 000000                         rpcs  =+0                     ; control status offset
+     170 000002                         rpwc  =+2                     ; word count offset
+     171 000004                         rpba  =+4                     ; bus addr offset
+     172 000010                         rpcs2 =+10                    ; control status 2 offset
+     173 000016                         rpas  =+16                    ; atten summary offset
+     174 000032                         rpof  =+32                    ; offset register offset
+     175                                
+     176                                
+     177 173324 012701  176700          rpgo:    mov   #rmcsr,r1      ; boot std csr, unit <R0>
+     178                                
+     179 173330 005061  000010                   clr   rpcs2(r1)   ; set unit number into controller
+     180 173334 012702  000071                   mov   #071,r2        ; READ+GO command code
+     181 173340 012711  000021                   mov   #021,(r1)      ; RIP+GO command
+     182 173344 012761  014000  000032           mov   #014000,rpof(r1)  ; set 16b mode, inhibit ECC mode
+     183 173352 016161  000016  000016           mov   rpas(r1),rpas(r1) ; clear attention bits
+     184                                
+     185 173360 012761  177000  000002           mov   #-512.,rpwc(r1)      ; set word count
+     186 173366 010211                           mov   r2,(r1)        ; execute read command
+     187 173370 105711                  2$:      tstb  (r1)           ; test unit ready
+     188 173372 100376                           bpl   2$             ; br if not yet
+     189                                
+     190 173374 005711                           tst   (r1)           ; test any error
+     191 173376 100002                           bpl   3$             ; br if not
+     192                                
+     193 173400 000005                           reset                ; error, reset the world
+     194 173402 000750                           br rpgo              ; and jump back to restart
+     195                                
+     196 173404 042711  000377          3$:      bic   #377,(r1)      ; nop command, clear controller
+     197 173410 005007                           clr   pc             ; jump to bootstrap start
+     198                                
+     199                                
+     200                                ;
+     201                                ; prtascz
+     202                                ; r1 - return address
+     203                                ; r2 - pointer to asciz string
+     204                                ;
+     205                                prtascz:
+     206                                $10:
+     207 173412 105737  177564                   tstb  @#177564
+     208 173416 100375                           bpl   $10
+     209 173420 105712                           tstb  (r2)
+     210 173422 001403                           beq   $20
+     211 173424 112237  177566                   movb  (r2)+,@#177566
+     212 173430 000770                           br    $10
+     213                                $20:
+     214 173432 000161  000002                   jmp   2(r1)
+     215                                ;
+     216                                ; prtoct
+     217                                ;
+     218                                ; R0 = register value to print
+     219                                ; R1 = return address
+     220                                ; R2 = temp char
+     221                                ; R3 = temp addr
+     222                                
+     223 173436 012702  000030          prtoct:  mov   #<'0/bit1>,r2  ; ascii 0 right 1b
+     224 173442 000261                           sec                  ; shift a 1 into R0 lsb as done bit
+     225 173444 006100                  1$:      rol   r0             ; msb out of R0
+     226 173446 106102                           rolb  r2             ; into lsb of R2
+     227 173450 105737  177564                   tstb  @#177564
+     228 173454 100375                           bpl   .-4
+     229 173456 110237  177566                   movb  r2,@#177566
+     230 173462 012702  020206                   mov   #<BL*bit8>+200+<'0/bit3>,r2 ; ascii SP upper, ascii 0 right 3b lower
+     231 173466 006300                  2$:      asl   r0             ; msb out of R0
+     232 173470 001403                           beq   3$             ; when R0 has gone to zero we are done
+     233 173472 106102                           rolb  r2             ; into lsb of R2
+     234 173474 103774                           bcs   2$             ; loop once more if flagbit was set
+     235 173476 000762                           br    1$             ; go get last bit and print char
+     236                                3$:
+     237 173500 000161  000002                   jmp   2(r1)          ; return
+     238                                ;
+     239                                ;
+     240                                ;
+     241 173504    015     012          bootrk:  .ascii <15><12>
+     242 173506    142     157     157           .ascii /boot from rk:/
+         173511    164     040     146  
+         173514    162     157     155  
+         173517    040     162     153  
+         173522    072                  
+     243 173523    015     012     000           .asciz <15><12>
+     244 173526    015     012          bootrl:  .ascii <15><12>
+     245 173530    142     157     157           .ascii /boot from rl:/
+         173533    164     040     146  
+         173536    162     157     155  
+         173541    040     162     154  
+         173544    072                  
+     246 173545    015     012     000           .asciz <15><12>
+     247 173550    015     012          bootrp:  .ascii <15><12>
+     248 173552    142     157     157           .ascii /boot from rp:/
+         173555    164     040     146  
+         173560    162     157     155  
+         173563    040     162     160  
+         173566    072                  
+     249 173567    015     012     000           .asciz <15><12>
+     250 173572    015     012          nodev:   .ascii <15><12>
+     251 173574    142     157     157           .ascii /boot: no dev/
+         173577    164     072     040  
+         173602    156     157     040  
+         173605    144     145     166  
+     252 173610    015     012     000           .asciz <15><12>
+     253 173613    000                           .even
+     254                                
+     255                                   .end
+     255                                
